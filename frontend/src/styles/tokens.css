@@ -1,0 +1,87 @@
+/*
+  Design tokens — "Wird" (وِرْد)
+  A quiet, manuscript-inspired palette: warm paper, deep teal-ink, brass accent.
+  Deliberately not the cream+terracotta or near-black+acid-accent defaults —
+  the accent is a muted brass, not orange, and the dark mode is teal-black, not neutral black.
+*/
+:root {
+  /* Light mode (default) */
+  --color-paper: #F4EFE3;
+  --color-paper-raised: #FBF8F1;
+  --color-ink: #1C2A25;
+  --color-ink-muted: #5B685F;
+  --color-line: #DFD5BE;
+  --color-primary: #2F5D50;
+  --color-primary-strong: #1F4038;
+  --color-primary-tint: #E4ECE7;
+  --color-accent: #B08A44;
+  --color-accent-tint: #F1E6CE;
+  --color-error: #A23E3E;
+  --color-error-tint: #F5E4E1;
+
+  --font-display-ar: "Amiri", "Traditional Arabic", serif;
+  --font-ui-ar: "Tajawal", "Segoe UI", sans-serif;
+  --font-display-en: "Newsreader", Georgia, serif;
+  --font-ui-en: "Inter", system-ui, sans-serif;
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+
+  --shadow-card: 0 1px 2px rgba(28, 42, 37, 0.04), 0 8px 24px -8px rgba(28, 42, 37, 0.12);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-paper: #12201D;
+    --color-paper-raised: #17271F;
+    --color-ink: #EDE7D8;
+    --color-ink-muted: #A8B3AA;
+    --color-line: #26362E;
+    --color-primary: #6FA593;
+    --color-primary-strong: #8CBBA9;
+    --color-primary-tint: #1C2E27;
+    --color-accent: #D7B876;
+    --color-accent-tint: #26221A;
+    --color-error: #D98080;
+    --color-error-tint: #2E1E1E;
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2), 0 8px 24px -8px rgba(0, 0, 0, 0.5);
+  }
+}
+
+[data-theme="dark"] {
+  --color-paper: #12201D;
+  --color-paper-raised: #17271F;
+  --color-ink: #EDE7D8;
+  --color-ink-muted: #A8B3AA;
+  --color-line: #26362E;
+  --color-primary: #6FA593;
+  --color-primary-strong: #8CBBA9;
+  --color-primary-tint: #1C2E27;
+  --color-accent: #D7B876;
+  --color-accent-tint: #26221A;
+  --color-error: #D98080;
+  --color-error-tint: #2E1E1E;
+}
+
+[data-theme="light"] {
+  --color-paper: #F4EFE3;
+  --color-paper-raised: #FBF8F1;
+  --color-ink: #1C2A25;
+  --color-ink-muted: #5B685F;
+  --color-line: #DFD5BE;
+  --color-primary: #2F5D50;
+  --color-primary-strong: #1F4038;
+  --color-primary-tint: #E4ECE7;
+  --color-accent: #B08A44;
+  --color-accent-tint: #F1E6CE;
+}

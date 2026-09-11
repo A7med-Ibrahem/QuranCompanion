@@ -1,0 +1,17 @@
+# Local Postgres for development only. Run: docker compose up -d
+version: "3.9"
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: quran_companion
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: CHANGE_ME
+    ports:
+      - "5432:5432"
+    volumes:
+      - quran_companion_data:/var/lib/postgresql/data
+
+volumes:
+  quran_companion_data:
