@@ -3,6 +3,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { OnlineStatusProvider } from "@/context/OnlineStatusContext";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { InstallAppButton } from "@/components/InstallAppButton";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { LoginPage } from "@/pages/LoginPage";
 import { RegisterPage } from "@/pages/RegisterPage";
@@ -26,6 +27,7 @@ export default function App() {
         <BrowserRouter>
           <AuthProvider>
             <OfflineBanner />
+            <InstallAppButton />
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
