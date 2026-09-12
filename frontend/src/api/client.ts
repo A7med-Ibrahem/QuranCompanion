@@ -1,7 +1,7 @@
 import axios, { AxiosError } from "axios";
 import type { AuthResponse } from "@/types/auth";
 
-const baseURL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5080/api";
+const baseURL = import.meta.env.VITE_API_BASE_URL ?? "http://qurancompanion.runasp.net/api";
 // The refresh token itself lives only in an httpOnly cookie set by the API
 // (see AuthController.SetRefreshCookie) - the browser JS never touches it.
 export const apiClient = axios.create({
