@@ -61,11 +61,10 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
+
     app.UseSwagger();
     app.UseSwaggerUI();
-}
+
 
 // Apply pending EF Core migrations and seed reference data (Surahs, etc.) on
 // every startup, in every environment - including production. MonsterASP
