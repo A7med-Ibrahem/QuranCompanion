@@ -70,7 +70,8 @@ public Task SendEmailConfirmationAsync(
     return SendAsync(
         toEmail,
         "تأكيد بريدك الإلكتروني - وِرْد",
-        BuildShell("تأكيد البريد الإلكتروني", content));
+        BuildShell("تأكيد البريد الإلكتروني", content),
+        ct);
 }
 
 public Task SendPasswordResetOtpAsync(
@@ -115,7 +116,8 @@ public Task SendPasswordResetOtpAsync(
     return SendAsync(
         toEmail,
         $"{code} — رمز إعادة تعيين كلمة المرور",
-        BuildShell("إعادة تعيين كلمة المرور", content));
+        BuildShell("إعادة تعيين كلمة المرور", content),
+        ct);
 }
 
 private static string BuildShell(string title, string innerContent) => $"""
@@ -176,7 +178,8 @@ private static string BuildShell(string title, string innerContent) => $"""
 private async Task SendAsync(
     string toEmail,
     string subject,
-    string htmlBody)
+    string htmlBody,
+    CancellationToken ct = default)
 {
     try
     {
@@ -204,7 +207,7 @@ private async Task SendAsync(
 
         message.To.Add(toEmail);
 
-        await client.SendMailAsync(message);
+        await client.SendMailAsync(message, ct);
 
         _logger.LogInformation(
             "Sent email to {Email}: {Subject}",
@@ -213,10 +216,14 @@ private async Task SendAsync(
     }
     catch (Exception ex)
     {
+        // Log, then propagate - callers (e.g. forgot-password) must know the
+        // email did NOT actually go out so they can fail honestly instead of
+        // telling the user a code was sent.
         _logger.LogError(
             ex,
             "Failed to send email to {Email}",
             toEmail);
+        throw;
     }
 }
 

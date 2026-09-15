@@ -60,4 +60,25 @@ public class QuranController : ControllerBase
         var results = await _searchService.SearchAsync(q, ct);
         return Ok(ApiResponse<object>.Ok(results));
     }
+
+    [HttpGet("page/{pageNumber:int}")]
+    public async Task<IActionResult> GetPage(int pageNumber, CancellationToken ct)
+    {
+        var page = await _quranService.GetPageAsync(pageNumber, ct);
+        return Ok(ApiResponse<object>.Ok(page));
+    }
+
+    [HttpGet("juz")]
+    public async Task<IActionResult> GetJuzList(CancellationToken ct)
+    {
+        var juzs = await _quranService.GetJuzListAsync(ct);
+        return Ok(ApiResponse<object>.Ok(juzs));
+    }
+
+    [HttpGet("juz/{juz:int}")]
+    public async Task<IActionResult> GetJuz(int juz, CancellationToken ct)
+    {
+        var start = await _quranService.GetJuzAsync(juz, ct);
+        return Ok(ApiResponse<object>.Ok(start));
+    }
 }

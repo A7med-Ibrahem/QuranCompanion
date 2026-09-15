@@ -4,7 +4,8 @@
     "\\backend",
     "\\backend\\src",
     "\\backend\\src\\QuranCompanion.Api",
-    "\\backend\\src\\QuranCompanion.Infrastructure"
+    "\\backend\\src\\QuranCompanion.Infrastructure",
+    "\\backend\\src\\QuranCompanion.Infrastructure\\Services"
   ],
   "SelectedNode": "\\backend\\QuranCompanion.sln",
   "PreviewInSolutionExplorer": false

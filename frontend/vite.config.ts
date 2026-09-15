@@ -43,9 +43,9 @@ export default defineConfig({
         navigateFallback: "/index.html",
         runtimeCaching: [
           {
-            // Surah list + each surah's full ayah text - read-only Quran content,
-            // safe to keep for a long time once fetched.
-            urlPattern: ({ url }) => /\/api\/quran\/surahs(\/\d+)?$/.test(url.pathname),
+            // Surah list + each surah's full ayah text + the juz list - read-only
+            // Quran content, safe to keep for a long time once fetched.
+            urlPattern: ({ url }) => /\/api\/quran\/(surahs(\/\d+)?|juz)$/.test(url.pathname),
             handler: "CacheFirst",
             options: {
               cacheName: "quran-text-cache",

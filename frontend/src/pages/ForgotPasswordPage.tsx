@@ -13,6 +13,7 @@ export function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -57,6 +58,14 @@ export function ForgotPasswordPage() {
     }
     if (newPassword.length < 8) {
       setError("كلمة المرور يجب ألا تقل عن 8 أحرف.");
+      return;
+    }
+    if (!/\d/.test(newPassword)) {
+      setError("كلمة المرور يجب أن تحتوي على رقم واحد على الأقل.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("كلمتا المرور غير متطابقتين.");
       return;
     }
 
@@ -118,6 +127,17 @@ export function ForgotPasswordPage() {
               autoComplete="new-password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="confirmPassword">تأكيد كلمة المرور الجديدة</label>
+            <input
+              id="confirmPassword"
+              type="password"
+              required
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
             />
           </div>
           <button className="btn-primary" type="submit" disabled={submitting}>

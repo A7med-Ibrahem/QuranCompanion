@@ -81,7 +81,7 @@ define(['./workbox-62aee36b'], (function (workbox) { 'use strict';
     "revision": "3ca0b8505b4bec776b69afdba2768812"
   }, {
     "url": "/index.html",
-    "revision": "0.uf9minh01eg"
+    "revision": "0.8846rsa1kpc"
   }], {});
   workbox.cleanupOutdatedCaches();
   workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("/index.html"), {
@@ -89,7 +89,7 @@ define(['./workbox-62aee36b'], (function (workbox) { 'use strict';
   }));
   workbox.registerRoute(({
     url
-  }) => /\/api\/quran\/surahs(\/\d+)?$/.test(url.pathname), new workbox.CacheFirst({
+  }) => /\/api\/quran\/(surahs(\/\d+)?|juz)$/.test(url.pathname), new workbox.CacheFirst({
     "cacheName": "quran-text-cache",
     plugins: [new workbox.ExpirationPlugin({
       maxEntries: 130,

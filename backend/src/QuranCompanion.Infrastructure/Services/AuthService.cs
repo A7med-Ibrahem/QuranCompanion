@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using QuranCompanion.Application.Common.Exceptions;
 using QuranCompanion.Application.Common.Interfaces;
@@ -19,11 +20,16 @@ public class AuthService : IAuthService
     private readonly IJwtTokenService _tokenService;
     private readonly IWirdIdGenerator _wirdIdGenerator;
     private readonly IEmailSender _emailSender;
+    private readonly ILogger<AuthService> _logger;
     private readonly JwtSettings _jwtSettings;
     private readonly GoogleAuthSettings _googleSettings;
 
     // Generic messages only - never reveal whether an email exists in the system.
     private const string GenericLoginError = "Incorrect email or password.";
+    private const string GenericResetError = "This code is invalid or has expired. Please request a new one.";
+
+    private static readonly System.Text.RegularExpressions.Regex EmailRegex =
+        new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", System.Text.RegularExpressions.RegexOptions.Compiled);
 
     public AuthService(
         UserManager<ApplicationUser> userManager,
@@ -31,6 +37,7 @@ public class AuthService : IAuthService
         IJwtTokenService tokenService,
         IWirdIdGenerator wirdIdGenerator,
         IEmailSender emailSender,
+        ILogger<AuthService> logger,
         IOptions<JwtSettings> jwtSettings,
         IOptions<GoogleAuthSettings> googleSettings)
     {
@@ -39,6 +46,7 @@ public class AuthService : IAuthService
         _tokenService = tokenService;
         _wirdIdGenerator = wirdIdGenerator;
         _emailSender = emailSender;
+        _logger = logger;
         _jwtSettings = jwtSettings.Value;
         _googleSettings = googleSettings.Value;
     }
@@ -71,12 +79,23 @@ public class AuthService : IAuthService
             throw new ValidationApiException(errors);
         }
 
-        // Fire off email verification (best-effort; never blocks registration).
+        // Best-effort email verification; never blocks registration. Failures
+        // are logged, never surfaced to the user (the account was already created).
         var confirmToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
         var encodedToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(confirmToken));
-        await _emailSender.SendEmailConfirmationAsync(
-            user.Email!, user.DisplayName,
-            $"/auth/confirm-email?userId={user.Id}&token={encodedToken}", ct);
+        var confirmEmail = user.Email!;
+        var confirmLink = $"/auth/confirm-email?userId={user.Id}&token={encodedToken}";
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _emailSender.SendEmailConfirmationAsync(confirmEmail, user.DisplayName, confirmLink, CancellationToken.None);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Failed to send email confirmation to {Email}", confirmEmail);
+            }
+        });
 
         return await IssueTokensAsync(user, ipAddress: null, ct);
     }
@@ -193,7 +212,12 @@ public class AuthService : IAuthService
 
     public async Task ForgotPasswordAsync(string email, CancellationToken ct = default)
     {
-        var user = await _userManager.FindByEmailAsync(email);
+        if (string.IsNullOrWhiteSpace(email) || !EmailRegex.IsMatch(email.Trim()))
+        {
+            throw new ApiException("Please enter a valid email address.", 400, "invalid_email");
+        }
+
+        var user = await _userManager.FindByEmailAsync(email.Trim());
         if (user == null) return; // never reveal whether the account exists
 
         // Invalidate any still-usable earlier codes so only the newest one works.
@@ -211,18 +235,44 @@ public class AuthService : IAuthService
         });
         await _db.SaveChangesAsync(ct);
 
-        await _emailSender.SendPasswordResetOtpAsync(user.Email!, user.DisplayName, code, ct);
+        try
+        {
+            // Await the real delivery status - the user must get a CODE, not a
+            // silent success if the SMTP send actually failed.
+            await _emailSender.SendPasswordResetOtpAsync(user.Email!, user.DisplayName, code, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send password-reset OTP to {Email}", user.Email);
+            // Meaningful, generic, transient-looking error. It only fires for an
+            // existing account whose verification actually failed to send, which is
+            // the honest behaviour the frontend depends on for its own message.
+            throw new ApiException(
+                "تعذّر إرسال رمز التحقق الآن. حاول مرة أخرى خلال بضع دقائق، أو تواصل مع الدعم.",
+                503, "email_send_failed");
+        }
     }
 
     public async Task ResetPasswordAsync(ResetPasswordRequest request, CancellationToken ct = default)
     {
-        const string genericError = "This code is invalid or has expired. Please request a new one.";
         const int maxAttempts = 5;
 
-        var user = await _userManager.FindByEmailAsync(request.Email);
+        if (string.IsNullOrWhiteSpace(request.Email) || !EmailRegex.IsMatch(request.Email.Trim()))
+        {
+            throw new ApiException("Please enter a valid email address.", 400, "invalid_email");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Code)
+            || request.Code.Trim().Length != 6
+            || request.Code.Trim().Any(c => c is < '0' or > '9'))
+        {
+            throw new ApiException(GenericResetError, 400, "invalid_reset_code");
+        }
+
+        var user = await _userManager.FindByEmailAsync(request.Email.Trim());
         if (user == null)
         {
-            throw new ApiException(genericError, 400, "invalid_reset_code");
+            throw new ApiException(GenericResetError, 400, "invalid_reset_code");
         }
 
         var otp = await _db.PasswordResetOtps
@@ -232,7 +282,7 @@ public class AuthService : IAuthService
 
         if (otp is null || !otp.IsUsable)
         {
-            throw new ApiException(genericError, 400, "invalid_reset_code");
+            throw new ApiException(GenericResetError, 400, "invalid_reset_code");
         }
 
         if (otp.Attempts >= maxAttempts)

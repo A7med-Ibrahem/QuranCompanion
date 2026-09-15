@@ -27,7 +27,29 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-let refreshPromise: Promise<AuthResponse | null> | null = null;
+let refreshPromise: Promise<RefreshResult> | null = null;
+
+/**
+ * Result of an attempt to refresh the session via the httpOnly cookie.
+ * Deliberately a three-state result - "logged out" (a real 401/403) must be
+ * distinguished from "can't reach the server right now", so offline users are
+ * NOT logged out on a flaky network (cache-first PWA users should stay on the
+ * last-read page).
+ */
+export type RefreshResult =
+  | { status: "ok"; auth: AuthResponse }
+  | { status: "expired" } // the refresh token itself was rejected (401/403)
+  | { status: "offline" }; // network / server trouble - keep the cached session
+
+function classifyRefreshError(error: unknown): RefreshResult {
+  if (axios.isAxiosError(error)) {
+    const status = error.response?.status;
+    // A real auth rejection means the session really is gone; everything else
+    // (no response = offline, 5xx, 429, ...) is temporary - don't drop the user.
+    if (status === 401 || status === 403) return { status: "expired" };
+  }
+  return { status: "offline" };
+}
 
 /**
  * The single source of truth for refreshing the session. Both AuthContext's
@@ -43,20 +65,21 @@ let refreshPromise: Promise<AuthResponse | null> | null = null;
  * StrictMode intentionally double-invokes effects (like AuthContext's mount
  * effect), which used to fire two independent refresh calls at once.
  */
-export async function silentRefresh(): Promise<AuthResponse | null> {
-  refreshPromise ??= (async () => {
-    try {
-      const { data } = await apiClient.post<{ success: boolean; data: AuthResponse }>("/auth/refresh");
-      setAccessToken(data.data.accessToken);
-      return data.data;
-    } catch {
-      setAccessToken(null);
-      return null;
-    }
-  })().finally(() => {
-    refreshPromise = null;
-  });
-
+export async function silentRefresh(): Promise<RefreshResult> {
+  if (!refreshPromise) {
+    refreshPromise = (async (): Promise<RefreshResult> => {
+      try {
+        const { data } = await apiClient.post<{ success: boolean; data: AuthResponse }>("/auth/refresh");
+        setAccessToken(data.data.accessToken);
+        return { status: "ok", auth: data.data };
+      } catch (error) {
+        setAccessToken(null);
+        return classifyRefreshError(error);
+      }
+    })().finally(() => {
+      refreshPromise = null;
+    });
+  }
   return refreshPromise;
 }
 
@@ -69,13 +92,17 @@ apiClient.interceptors.response.use(
       original._retried = true;
       const result = await silentRefresh();
 
-      if (result) {
+      if (result.status === "ok") {
         original.headers = original.headers ?? {};
-        original.headers.Authorization = `Bearer ${result.accessToken}`;
+        original.headers.Authorization = `Bearer ${result.auth.accessToken}`;
         return apiClient(original);
       }
 
-      onUnauthorized?.();
+      // Only a real auth rejection should log the user out. An offline/temporary
+      // failure just rejects this one request - the cached session stays intact.
+      if (result.status === "expired") {
+        onUnauthorized?.();
+      }
     }
 
     return Promise.reject(error);

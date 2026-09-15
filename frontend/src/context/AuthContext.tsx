@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { authApi } from "@/api/authApi";
 import { setAccessToken, setUnauthorizedHandler, silentRefresh } from "@/api/client";
 import type { UserProfile } from "@/types/auth";
@@ -15,13 +15,44 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+// Offline cache - stores ONLY the non-sensitive public profile (name, wird id,
+// ...). Access tokens live in memory and the refresh token only in an httpOnly
+// cookie, so nothing here can be used to impersonate the user if compromised.
+const USER_CACHE_KEY = "wird.user";
+
+function loadCachedUser(): UserProfile | null {
+  try {
+    const raw = localStorage.getItem(USER_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as UserProfile;
+    if (!parsed || typeof parsed.id !== "string" || typeof parsed.displayName !== "string") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveCachedUser(user: UserProfile | null) {
+  try {
+    if (user) localStorage.setItem(USER_CACHE_KEY, JSON.stringify(user));
+    else localStorage.removeItem(USER_CACHE_KEY);
+  } catch {
+    // Storage can be unavailable (private mode/quota) - safe to ignore.
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Hydrate synchronously from the cache (NOT a token) so a PWA user who is
+  // offline on page load stays "logged in" instead of bouncing to /login.
+  const initialUser = useRef<UserProfile | null>(loadCachedUser()).current;
+  const [user, setUser] = useState<UserProfile | null>(initialUser);
+  // Only wait for the network check when there's nothing cached to show yet.
+  const [isLoading, setIsLoading] = useState(() => initialUser === null);
 
   const clearSession = useCallback(() => {
     setAccessToken(null);
     setUser(null);
+    saveCachedUser(null);
   }, []);
 
   // On first load, try to silently refresh using the httpOnly cookie -
@@ -36,11 +67,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUnauthorizedHandler(clearSession);
     (async () => {
       const result = await silentRefresh();
-      if (result) {
-        setUser(result.user);
-      } else {
+
+      if (result.status === "ok") {
+        setUser(result.auth.user);
+        saveCachedUser(result.auth.user);
+      } else if (result.status === "expired") {
+        // The server explicitly rejected the refresh token - this is a real
+        // logout, so drop everything (including the offline cache).
         clearSession();
       }
+      // status === "offline": network/server trouble - keep the cached user
+      // exactly as-is; they can keep reading offline (ProtectedRoute relies on
+      // this: clearSession is NOT called here).
+
       setIsLoading(false);
     })();
   }, [clearSession]);
@@ -49,18 +88,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = await authApi.login({ email, password });
     setAccessToken(result.accessToken);
     setUser(result.user);
+    saveCachedUser(result.user);
   }, []);
 
   const loginWithGoogle = useCallback(async (idToken: string) => {
     const result = await authApi.googleLogin(idToken);
     setAccessToken(result.accessToken);
     setUser(result.user);
+    saveCachedUser(result.user);
   }, []);
 
   const register = useCallback(async (email: string, password: string, displayName: string) => {
     const result = await authApi.register({ email, password, displayName });
     setAccessToken(result.accessToken);
     setUser(result.user);
+    saveCachedUser(result.user);
   }, []);
 
   const logout = useCallback(async () => {
@@ -74,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshProfile = useCallback(async () => {
     const profile = await authApi.me();
     setUser(profile);
+    saveCachedUser(profile);
   }, []);
 
   const value = useMemo(
